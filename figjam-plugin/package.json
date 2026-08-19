@@ -1,0 +1,15 @@
+{
+  "name": "unimap-figjam-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FigJam renderer for UniMap Unity Brain Map JSON exports.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node tests/validate-examples.mjs && node tests/mock-smoke.mjs",
+    "check": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "1.109.0",
+    "typescript": "5.8.3"
+  }
+}

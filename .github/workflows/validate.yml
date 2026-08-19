@@ -1,0 +1,38 @@
+name: Validate UniMap
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  figjam-and-repository:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: figjam-plugin/package-lock.json
+
+      - name: Install FigJam dependencies
+        working-directory: figjam-plugin
+        run: npm ci
+
+      - name: Build FigJam plugin
+        working-directory: figjam-plugin
+        run: npm run build
+
+      - name: Verify generated artifact is committed
+        run: git diff --exit-code -- figjam-plugin/dist/code.js
+
+      - name: Run FigJam tests
+        working-directory: figjam-plugin
+        run: npm test
+
+      - name: Validate repository contract
+        run: node scripts/validate-repo.mjs

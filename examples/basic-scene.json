@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "scene": "SampleScene",
+  "unityVersion": "6000.3.0f1",
+  "source": "active-scene",
+  "hierarchyObjects": [
+    {
+      "Name": "Player",
+      "IsEnabled": true,
+      "Depth": 0,
+      "Components": [
+        {
+          "Name": "Transform",
+          "IsEnabled": true
+        },
+        {
+          "Name": "CharacterController",
+          "IsEnabled": true
+        },
+        {
+          "Name": "PlayerInput",
+          "IsEnabled": true
+        }
+      ],
+      "Children": [
+        {
+          "Name": "Camera",
+          "IsEnabled": true,
+          "Depth": 1,
+          "Components": [
+            {
+              "Name": "Transform",
+              "IsEnabled": true
+            },
+            {
+              "Name": "Camera",
+              "IsEnabled": true
+            }
+          ],
+          "Children": []
+        }
+      ]
+    },
+    {
+      "Name": "Environment",
+      "IsEnabled": true,
+      "Depth": 0,
+      "Components": [
+        {
+          "Name": "Transform",
+          "IsEnabled": true
+        }
+      ],
+      "Children": []
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0",
+  "scene": "NestedExample",
+  "unityVersion": "6000.0.60f1",
+  "source": "selection",
+  "hierarchyObjects": [
+    {
+      "Name": "World",
+      "IsEnabled": true,
+      "Depth": 0,
+      "Components": [
+        {
+          "Name": "Transform",
+          "IsEnabled": true
+        }
+      ],
+      "Children": [
+        {
+          "Name": "Gameplay",
+          "IsEnabled": true,
+          "Depth": 1,
+          "Components": [
+            {
+              "Name": "Transform",
+              "IsEnabled": true
+            },
+            {
+              "Name": "GameplayDirector",
+              "IsEnabled": false
+            }
+          ],
+          "Children": [
+            {
+              "Name": "DisabledSpawnPoint",
+              "IsEnabled": false,
+              "Depth": 2,
+              "Components": [
+                {
+                  "Name": "Transform",
+                  "IsEnabled": true
+                },
+                {
+                  "Name": "BoxCollider",
+                  "IsEnabled": false
+                }
+              ],
+              "Children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

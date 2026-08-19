@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/LuminaryLabs-Dev/UniMap/blob/main/schema/unimap-v1.schema.json",
+  "title": "UniMap JSON v1",
+  "description": "Structural Unity scene/selection snapshot consumed by the UniMap FigJam renderer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "scene",
+    "unityVersion",
+    "source",
+    "hierarchyObjects"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "scene": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unityVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "enum": [
+        "active-scene",
+        "selection"
+      ]
+    },
+    "hierarchyObjects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hierarchyObject"
+      }
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Name",
+        "IsEnabled"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "IsEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "hierarchyObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Name",
+        "IsEnabled",
+        "Depth",
+        "Components",
+        "Children"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "IsEnabled": {
+          "type": "boolean"
+        },
+        "Depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "Components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/component"
+          }
+        },
+        "Children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hierarchyObject"
+          }
+        }
+      }
+    }
+  }
+}

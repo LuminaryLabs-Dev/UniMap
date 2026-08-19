@@ -1,0 +1,20 @@
+# Node
+**/node_modules/
+npm-debug.log*
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Unity-generated files if the package is embedded in a project
+Library/
+Temp/
+Obj/
+Logs/
+UserSettings/
+*.csproj
+*.sln
+
+# Local validation scratch
+.tmp/

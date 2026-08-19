@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "ES2017"
+    ],
+    "strict": true,
+    "module": "none",
+    "outFile": "dist/code.js",
+    "noEmitOnError": true,
+    "skipLibCheck": false,
+    "types": [
+      "@figma/plugin-typings"
+    ]
+  },
+  "include": [
+    "src/code.ts"
+  ]
+}
