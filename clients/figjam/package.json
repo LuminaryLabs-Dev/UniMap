@@ -1,0 +1,15 @@
+{
+  "name": "unimap-figjam-client",
+  "version": "0.2.0",
+  "private": true,
+  "description": "FigJam client and Brain Map renderer for the local UniMap Unity Editor API.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node tests/validate-examples.mjs && node tests/mock-smoke.mjs && node tests/client-contract.mjs && node tests/client-smoke.mjs",
+    "check": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "1.109.0",
+    "typescript": "5.8.3"
+  }
+}

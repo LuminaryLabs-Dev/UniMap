@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  figjam-and-repository:
+  static-and-figjam:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,21 +17,21 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: figjam-plugin/package-lock.json
+          cache-dependency-path: clients/figjam/package-lock.json
 
       - name: Install FigJam dependencies
-        working-directory: figjam-plugin
+        working-directory: clients/figjam
         run: npm ci
 
-      - name: Build FigJam plugin
-        working-directory: figjam-plugin
+      - name: Build FigJam client
+        working-directory: clients/figjam
         run: npm run build
 
       - name: Verify generated artifact is committed
-        run: git diff --exit-code -- figjam-plugin/dist/code.js
+        run: git diff --exit-code -- clients/figjam/dist/code.js
 
       - name: Run FigJam tests
-        working-directory: figjam-plugin
+        working-directory: clients/figjam
         run: npm test
 
       - name: Validate repository contract

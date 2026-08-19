@@ -1,92 +1,43 @@
 # Architecture
 
-UniMap is intentionally a one-way, local-first visualization pipeline.
+## System shape
 
 ```text
-┌──────────────────────┐
-│ Unity 6 Editor       │
-│                      │
-│ Scene / Selection    │
-└──────────┬───────────┘
-           │ scan
-           ▼
-┌──────────────────────┐
-│ UniMap hierarchy     │
-│ model                │
-│                      │
-│ GameObjects          │
-│ Components           │
-│ Enabled state        │
-│ Children + depth     │
-└──────────┬───────────┘
-           │ serialize
-           ▼
-┌──────────────────────┐
-│ UniMap JSON v1       │
-│ schema contract      │
-└──────────┬───────────┘
-           │ local file
-           ▼
-┌──────────────────────┐
-│ FigJam plugin UI     │
-│ file selection       │
-└──────────┬───────────┘
-           │ render-document
-           ▼
-┌──────────────────────┐
-│ TypeScript renderer  │
-│ validation + layout  │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ FigJam Brain Map     │
-│ sections + stickies  │
-└──────────────────────┘
+Unity Editor main thread
+  ├─ scene / selection events
+  ├─ hierarchy scanner
+  ├─ UniMap model validation
+  └─ immutable snapshot cache
+              ↓
+      loopback HTTP host
+      (background thread)
+              ↓
+     local read-only clients
 ```
 
-## Unity side
+The central invariant is: **request threads never traverse Unity objects**.
 
-### `UniMapHierarchyScanner`
+## Unity main-thread layer
 
-Reads either the active scene or a top-level selection. It recursively captures GameObjects, components, active state, depth, and children. It deliberately avoids arbitrary serialized fields.
+`UniMapHierarchyScanner` reads the active scene or selection and produces `UniMapDocument` objects. `UniMapSerializer` validates them before serialization.
 
-### `UniMapSerializer`
+`UniMapSnapshotService` listens to hierarchy, selection and play-mode changes, debounces them, and rebuilds the cache on `EditorApplication.update`. The cached snapshot contains only strings and metadata safe to read from the host thread.
 
-Owns the serializable data classes, validates the in-memory contract, and produces JSON using Unity's built-in `JsonUtility`.
+## Transport layer
 
-### `UniMapExporter`
+`UniMapHost` uses a `TcpListener` bound to `IPAddress.Loopback`. It accepts a deliberately tiny HTTP subset:
 
-Coordinates scanning, validation, serialization, file naming, and the Editor save dialog.
+- `GET`
+- `OPTIONS`
+- request line + headers only
+- no request bodies
 
-### `UniMapWindow`
+`UniMapRouter` is transport-independent and routes cached values. Protected routes require a per-session bearer token.
 
-Provides the human-facing `Tools → UniMap` Editor surface.
+## Client layer
 
-## Data boundary
+Clients depend on the protocol rather than Unity internals. The FigJam client connects to the local host, downloads `/v1/scene` or `/v1/selection`, validates UniMap JSON v1, and renders a Brain Map.
 
-`schema/unimap-v1.schema.json` is the contract between Unity and FigJam. Both sides must treat the schema as authoritative. A schema change that breaks v1 consumers requires a new schema version rather than silently changing v1.
+## Optional export layer
 
-## FigJam side
-
-### UI
-
-`figjam-plugin/ui.html` is only responsible for local file selection, basic JSON syntax checking, status display, and sending messages to the plugin main context.
-
-### Renderer
-
-`figjam-plugin/src/code.ts` is the only source of truth. It:
-
-1. parses JSON
-2. validates the UniMap v1 structure before modifying the canvas
-3. enforces safety limits on node/component counts and hierarchy depth
-4. creates a root section for the scene
-5. recursively creates sections for GameObjects
-6. creates sticky notes for components
-7. marks disabled objects/components in names and color treatment
-8. selects and zooms to the completed map
-
-`dist/code.js` is generated output and must never be edited directly.
-
-## Non-goals
-
-v0.1 does not implement live synchronization, network transport, two-way editing, serialized-property inspection, runtime telemetry, or Unity scene mutation from FigJam.
+`UniMapExporter` remains for offline snapshots. It is not the primary integration path.

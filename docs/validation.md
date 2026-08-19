@@ -1,45 +1,48 @@
-# Validation status
+# Validation Status
 
-This file separates what the repository proves from what still requires the real host applications.
+## Can be validated without Unity/FigJam
 
-## Repository/static validation
+- JSON syntax and schema contract
+- OpenAPI endpoint declaration
+- TypeScript source compilation
+- generated `dist/code.js` parity
+- FigJam renderer mock smoke
+- malformed-document rejection before canvas mutation
+- client localhost/network manifest contract
+- repository path/guardrail checks
+- static C# architecture checks: loopback binding, no wildcard binding, GET/OPTIONS-only router, snapshot-only request path
 
-| Area | Status |
-|---|---|
-| repository structure | validated |
-| JSON files parse | validated |
-| UniMap v1 schema/examples agree | validated |
-| FigJam TypeScript emits generated JS | validated locally with TypeScript 5.8.3 against a minimal API compatibility stub; official `@figma/plugin-typings` install/build is delegated to CI |
-| generated JS syntax | validated locally |
-| mocked FigJam render smoke | validated locally |
-| malformed FigJam input rejection | validated locally |
-| package-lock/package.json pins agree | validated; networked `npm ci` pending CI |
-| Unity package manifest parses | validated |
-| Unity C# source structure | reviewed/static only |
+## Requires Unity Editor
 
-## Host-runtime validation
+- C# compilation against actual Unity 6 assemblies
+- package import through UPM
+- EditMode test execution
+- automatic host startup
+- real loopback socket bind on each OS
+- hierarchy/selection event refresh behavior
+- actual `/v1/*` responses from Unity
 
-| Host | Status |
-|---|---|
-| Unity 6.3 LTS import + EditMode tests | pending real Unity Editor run |
-| Unity 6.0 LTS import + EditMode tests | pending real Unity Editor run |
-| later Unity 6 update | not yet claimed |
-| FigJam development-plugin import | pending real FigJam run |
-| FigJam render from a real Unity export | pending end-to-end host smoke |
-| Figma marketplace publishing ownership for historical ID | unknown / must verify before release |
+## Requires FigJam
 
-## Why these remain pending
+- manifest localhost CSP behavior
+- browser CORS preflight against the Unity host
+- real connection/token flow
+- real sections/stickies layout and rendering
 
-The rehabilitation environment can validate files, JavaScript execution, schema behavior, and mocked host interactions, but it does not contain the Unity Editor or a FigJam runtime and cannot reach the npm registry. GitHub Actions performs the clean `npm ci` + official Figma typings build after push. UniMap therefore does not label those outcomes as verified until they are actually executed in the host applications.
+## Release gate
 
-## Release validation commands
+Do not tag v0.2.0 until this chain passes in Unity 6.3 and FigJam:
 
-```bash
-cd figjam-plugin
-npm ci
-npm run check
-cd ..
-node scripts/validate-repo.mjs
+```text
+Unity scene
+  ↓
+UniMap snapshot
+  ↓
+localhost /v1/scene
+  ↓
+FigJam client
+  ↓
+Brain Map
 ```
 
-Then run `LuminaryLabs.UniMap.Editor.Tests` in Unity Test Framework and complete the manual end-to-end path described in [compatibility.md](compatibility.md).
+Then repeat the Unity package/host smoke in Unity 6.0 before marking 6.0 fully supported.

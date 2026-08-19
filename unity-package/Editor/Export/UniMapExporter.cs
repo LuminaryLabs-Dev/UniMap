@@ -22,7 +22,7 @@ namespace LuminaryLabs.UniMap
             string json = UniMapSerializer.Serialize(document, prettyPrint: true);
             string defaultFileName = $"{SanitizeFileName(document.scene)}.unimap.json";
             string path = EditorUtility.SaveFilePanel(
-                "Export UniMap Brain Map",
+                "Export UniMap Brain Map Snapshot",
                 string.Empty,
                 defaultFileName,
                 "json");

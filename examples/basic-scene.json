@@ -9,18 +9,9 @@
       "IsEnabled": true,
       "Depth": 0,
       "Components": [
-        {
-          "Name": "Transform",
-          "IsEnabled": true
-        },
-        {
-          "Name": "CharacterController",
-          "IsEnabled": true
-        },
-        {
-          "Name": "PlayerInput",
-          "IsEnabled": true
-        }
+        { "Name": "Transform", "IsEnabled": true },
+        { "Name": "CharacterController", "IsEnabled": true },
+        { "Name": "PlayerInput", "IsEnabled": true }
       ],
       "Children": [
         {
@@ -28,14 +19,8 @@
           "IsEnabled": true,
           "Depth": 1,
           "Components": [
-            {
-              "Name": "Transform",
-              "IsEnabled": true
-            },
-            {
-              "Name": "Camera",
-              "IsEnabled": true
-            }
+            { "Name": "Transform", "IsEnabled": true },
+            { "Name": "Camera", "IsEnabled": true }
           ],
           "Children": []
         }
@@ -46,10 +31,7 @@
       "IsEnabled": true,
       "Depth": 0,
       "Components": [
-        {
-          "Name": "Transform",
-          "IsEnabled": true
-        }
+        { "Name": "Transform", "IsEnabled": true }
       ],
       "Children": []
     }

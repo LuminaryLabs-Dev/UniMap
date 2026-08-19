@@ -4,9 +4,9 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
-const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const repoRoot = path.resolve(pluginRoot, '..');
-const code = fs.readFileSync(path.join(pluginRoot, 'dist', 'code.js'), 'utf8');
+const clientRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(clientRoot, '..', '..');
+const code = fs.readFileSync(path.join(clientRoot, 'dist', 'code.js'), 'utf8');
 const example = fs.readFileSync(path.join(repoRoot, 'examples', 'basic-scene.json'), 'utf8');
 
 class MockNode {
@@ -20,7 +20,6 @@ class MockNode {
     this.parent = null;
     this.children = [];
     this.fills = [];
-    this.removed = false;
   }
   appendChild(child) {
     if (child.parent && child.parent.children) {
@@ -33,20 +32,17 @@ class MockNode {
     this.width = width;
     this.height = height;
   }
-  remove() {
-    this.removed = true;
-  }
 }
 
 class MockSticky extends MockNode {
   constructor() {
     super('STICKY', 240, 240);
     this.authorVisible = true;
-    this.text = {
-      fontName: null,
-      fontSize: 12,
-      characters: '',
-    };
+    this.text = { fontName: null, fontSize: 12, characters: '' };
+  }
+  rescale(scale) {
+    this.width *= scale;
+    this.height *= scale;
   }
 }
 
@@ -56,6 +52,7 @@ const postedMessages = [];
 const notifications = [];
 let showUiCalls = 0;
 let scrolled = false;
+const clientStorage = new Map([['unimap.baseUrl', 'http://localhost:17432'], ['unimap.token', '0123456789abcdef0123456789abcdef']]);
 
 const figma = {
   showUI() { showUiCalls += 1; },
@@ -76,9 +73,11 @@ const figma = {
     onmessage: undefined,
     postMessage(message) { postedMessages.push(message); },
   },
-  currentPage: {
-    selection: [],
+  clientStorage: {
+    async getAsync(key) { return clientStorage.get(key); },
+    async setAsync(key, value) { clientStorage.set(key, value); },
   },
+  currentPage: { selection: [] },
   viewport: {
     center: { x: 1000, y: 800 },
     scrollAndZoomIntoView() { scrolled = true; },
@@ -88,21 +87,27 @@ const figma = {
 const context = vm.createContext({ figma, __html__: '<html></html>' });
 vm.runInContext(code, context, { filename: 'dist/code.js' });
 
-assert.equal(showUiCalls, 1, 'plugin should show its UI exactly once');
-assert.equal(typeof figma.ui.onmessage, 'function', 'plugin should register a UI message handler');
+assert.equal(showUiCalls, 1);
+assert.equal(typeof figma.ui.onmessage, 'function');
 
-await figma.ui.onmessage({ type: 'render-document', rawJson: example, fileName: 'basic-scene.json' });
-assert.ok(createdSections.length >= 4, 'expected scene and hierarchy sections');
-assert.ok(createdStickies.length >= 5, 'expected component sticky notes');
-assert.equal(figma.currentPage.selection.length, 1, 'rendered scene section should be selected');
-assert.equal(scrolled, true, 'viewport should focus the rendered Brain Map');
-assert.ok(postedMessages.some(message => message.type === 'render-success'), 'UI should receive render-success');
-assert.ok(notifications.some(entry => String(entry.message).includes('rendered')), 'plugin should notify success');
-assert.ok(createdStickies.some(sticky => sticky.text.characters === 'CharacterController'), 'component names should be rendered');
+await figma.ui.onmessage({ type: 'load-connection-settings' });
+assert.ok(postedMessages.some(message => message.type === 'connection-settings' && message.baseUrl === 'http://localhost:17432'));
+await figma.ui.onmessage({ type: 'save-connection-settings', baseUrl: 'http://localhost:17433', token: 'fedcba9876543210fedcba9876543210' });
+assert.equal(clientStorage.get('unimap.baseUrl'), 'http://localhost:17433');
+assert.equal(clientStorage.get('unimap.token'), 'fedcba9876543210fedcba9876543210');
+
+await figma.ui.onmessage({ type: 'render-document', rawJson: example });
+assert.equal(createdSections.length, 4, 'scene + Player + Camera + Environment');
+assert.equal(createdStickies.length, 6, 'all fixture components should be sticky notes');
+assert.equal(figma.currentPage.selection.length, 1);
+assert.equal(scrolled, true);
+assert.ok(postedMessages.some(message => message.type === 'render-success'));
+assert.ok(notifications.some(entry => String(entry.message).includes('rendered')));
+assert.ok(createdStickies.some(sticky => sticky.text.characters === 'CharacterController'));
 
 const sectionCountBeforeInvalid = createdSections.length;
-await figma.ui.onmessage({ type: 'render-document', rawJson: '{}', fileName: 'invalid.json' });
+await figma.ui.onmessage({ type: 'render-document', rawJson: '{}' });
 assert.equal(createdSections.length, sectionCountBeforeInvalid, 'invalid documents must fail before canvas mutation');
-assert.ok(postedMessages.some(message => message.type === 'render-error'), 'UI should receive render-error');
+assert.ok(postedMessages.some(message => message.type === 'render-error'));
 
-console.log('UniMap FigJam mock smoke passed.');
+console.log('UniMap FigJam renderer mock smoke passed.');

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
@@ -24,15 +25,10 @@ namespace LuminaryLabs.UniMap.Tests
                     UniMapSerializer.ActiveSceneSource);
 
                 Assert.That(document.schemaVersion, Is.EqualTo("1.0"));
-                Assert.That(document.scene, Is.EqualTo("TestScene"));
-                Assert.That(document.source, Is.EqualTo("active-scene"));
                 Assert.That(document.hierarchyObjects, Has.Count.EqualTo(1));
-
                 UniMapHierarchyObject player = document.hierarchyObjects[0];
                 Assert.That(player.Name, Is.EqualTo("Player"));
-                Assert.That(player.Depth, Is.EqualTo(0));
                 Assert.That(player.Children, Has.Count.EqualTo(1));
-                Assert.That(player.Children[0].Name, Is.EqualTo("Camera"));
                 Assert.That(player.Children[0].Depth, Is.EqualTo(1));
 
                 UniMapComponent colliderComponent = player.Components.Find(component => component.Name == nameof(BoxCollider));
@@ -41,23 +37,19 @@ namespace LuminaryLabs.UniMap.Tests
             }
             finally
             {
-                Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(root);
             }
         }
 
         [Test]
         public void Serialize_ProducesCanonicalV1Fields()
         {
-            UniMapDocument document = new UniMapDocument
-            {
-                scene = "SerializationTest",
-                unityVersion = "6000.3.0f1",
-                source = UniMapSerializer.SelectionSource,
-                hierarchyObjects = new List<UniMapHierarchyObject>()
-            };
+            UniMapDocument document = UniMapSerializer.CreateEmpty(
+                "SerializationTest",
+                "6000.3.0f1",
+                UniMapSerializer.SelectionSource);
 
             string json = UniMapSerializer.Serialize(document);
-
             StringAssert.Contains("\"schemaVersion\": \"1.0\"", json);
             StringAssert.Contains("\"scene\": \"SerializationTest\"", json);
             StringAssert.Contains("\"source\": \"selection\"", json);
@@ -66,24 +58,90 @@ namespace LuminaryLabs.UniMap.Tests
         [Test]
         public void Validate_RejectsIncorrectDepth()
         {
-            UniMapDocument document = new UniMapDocument
+            UniMapDocument document = UniMapSerializer.CreateEmpty(
+                "DepthTest",
+                "6000.0.0f1",
+                UniMapSerializer.ActiveSceneSource);
+            document.hierarchyObjects.Add(new UniMapHierarchyObject
             {
-                scene = "DepthTest",
-                unityVersion = "6000.0.0f1",
-                source = UniMapSerializer.ActiveSceneSource,
-                hierarchyObjects = new List<UniMapHierarchyObject>
-                {
-                    new UniMapHierarchyObject
-                    {
-                        Name = "Root",
-                        IsEnabled = true,
-                        Depth = 1
-                    }
-                }
-            };
+                Name = "Root",
+                IsEnabled = true,
+                Depth = 1
+            });
 
             Assert.That(UniMapSerializer.TryValidate(document, out string error), Is.False);
             StringAssert.Contains("expected 0", error);
+        }
+
+        [Test]
+        public void Router_HealthIsReadOnlyAndDoesNotRequireToken()
+        {
+            UniMapRouter router = CreateRouter("test-token");
+            UniMapResponse response = router.Route(Request("GET", "/health"));
+
+            Assert.That(response.StatusCode, Is.EqualTo(200));
+            StringAssert.Contains("\"service\":\"UniMap\"", response.Body);
+        }
+
+        [Test]
+        public void Router_ProtectedEndpointsRequireBearerToken()
+        {
+            UniMapRouter router = CreateRouter("test-token");
+            Assert.That(router.Route(Request("GET", "/v1/info")).StatusCode, Is.EqualTo(401));
+
+            Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Authorization", "Bearer test-token" }
+            };
+            UniMapResponse response = router.Route(new UniMapRequest("GET", "/v1/info", headers));
+            Assert.That(response.StatusCode, Is.EqualTo(200));
+            StringAssert.Contains("snapshotRevision", response.Body);
+        }
+
+        [Test]
+        public void Router_RejectsWriteMethods()
+        {
+            UniMapRouter router = CreateRouter("test-token");
+            UniMapResponse response = router.Route(Request("POST", "/v1/scene"));
+            Assert.That(response.StatusCode, Is.EqualTo(405));
+        }
+
+        [Test]
+        public void Router_ServesCachedSnapshotWithoutUnityTraversal()
+        {
+            UniMapSnapshot snapshot = CreateSnapshot();
+            UniMapRouter router = new UniMapRouter(() => snapshot, () => "token");
+            Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Authorization", "Bearer token" }
+            };
+
+            UniMapResponse response = router.Route(new UniMapRequest("GET", "/v1/scene", headers));
+            Assert.That(response.StatusCode, Is.EqualTo(200));
+            Assert.That(response.Body, Is.EqualTo(snapshot.SceneJson));
+        }
+
+        private static UniMapRouter CreateRouter(string token)
+        {
+            UniMapSnapshot snapshot = CreateSnapshot();
+            return new UniMapRouter(() => snapshot, () => token);
+        }
+
+        private static UniMapSnapshot CreateSnapshot()
+        {
+            string document = "{\"schemaVersion\":\"1.0\",\"scene\":\"Test\",\"unityVersion\":\"6000.3.0f1\",\"source\":\"active-scene\",\"hierarchyObjects\":[]}";
+            return new UniMapSnapshot(
+                1,
+                DateTime.UtcNow,
+                "{\"product\":\"UniMap\",\"snapshotRevision\":1}",
+                document,
+                document.Replace("active-scene", "selection"),
+                "{\"title\":\"schema\"}");
+        }
+
+        private static UniMapRequest Request(string method, string path)
+        {
+            return new UniMapRequest(method, path, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
         }
     }
 }

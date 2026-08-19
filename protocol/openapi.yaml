@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: UniMap Local API
+  version: 0.2.0
+  description: >-
+    Read-only loopback API hosted by the Unity Editor. The service exposes cached
+    structural snapshots; HTTP request threads never traverse Unity scene objects.
+servers:
+  - url: http://localhost:17432
+    description: Default loopback port. UniMap may use ports 17433-17442 when occupied.
+paths:
+  /health:
+    get:
+      summary: Check whether a UniMap host is listening
+      security: []
+      responses:
+        '200':
+          description: Host is running
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service, apiVersion]
+                properties:
+                  status: { const: ok }
+                  service: { const: UniMap }
+                  apiVersion: { const: '1' }
+  /v1/info:
+    get:
+      summary: Read current host and snapshot metadata
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Current snapshot metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Info'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/scene:
+    get:
+      summary: Read the cached active-scene snapshot
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: UniMap JSON v1 active-scene document
+          content:
+            application/json:
+              schema:
+                $ref: './unimap-v1.schema.json'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/selection:
+    get:
+      summary: Read the cached selection snapshot
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: UniMap JSON v1 selection document
+          content:
+            application/json:
+              schema:
+                $ref: './unimap-v1.schema.json'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/schema:
+    get:
+      summary: Read the canonical UniMap JSON v1 schema
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: JSON Schema for UniMap documents
+          content:
+            application/json:
+              schema:
+                type: object
+        '401': { $ref: '#/components/responses/Unauthorized' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Per-Unity-session token copied from the UniMap Editor window.
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+  schemas:
+    Info:
+      type: object
+      required:
+        - product
+        - apiVersion
+        - unityVersion
+        - project
+        - scene
+        - snapshotRevision
+        - snapshotCreatedUtc
+      properties:
+        product: { const: UniMap }
+        apiVersion: { const: '1' }
+        unityVersion: { type: string }
+        project: { type: string }
+        scene: { type: string }
+        snapshotRevision: { type: integer, minimum: 1 }
+        snapshotCreatedUtc: { type: string }

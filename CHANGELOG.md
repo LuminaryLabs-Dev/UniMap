@@ -1,23 +1,22 @@
 # Changelog
 
-All notable UniMap changes are recorded here.
+## Unreleased
 
-## 0.1.0 — 2026-08-19
+### v0.2.0 foundation
 
-### Added
+- Reframed UniMap as a Unity-hosted local integration API.
+- Added loopback-only read-only HTTP service with ports 17432-17442.
+- Added per-session bearer-token authentication.
+- Added cached main-thread snapshot service and debounced hierarchy/selection refresh.
+- Added `/health`, `/v1/info`, `/v1/scene`, `/v1/selection`, and `/v1/schema`.
+- Added OpenAPI protocol definition.
+- Moved the FigJam integration under `clients/figjam/` and converted it to a localhost API client.
+- Kept manual JSON export/import as a fallback.
+- Added route/authentication tests and repository safety checks.
 
-- established **UniMap — Unity Brain Map** as the maintained project identity
-- added Unity 6 UPM package with active-scene and selection export
-- added UniMap JSON v1 schema and example fixtures
-- rebuilt the FigJam renderer in authoritative TypeScript
-- added schema validation and guarded error handling before canvas mutation
-- added recursive hierarchy sections and component sticky notes
-- added offline FigJam UI and development manifest
-- added mock FigJam smoke tests and example-format validation
-- added Unity EditMode tests for hierarchy scanning and serialization
-- added documentation for architecture, usage, compatibility, validation, and history
-- added repository validation workflow
+## v0.1.0 foundation — unreleased tag
 
-### Historical provenance
+- Introduced the Unity 6 UPM package, UniMap JSON v1, example fixtures and FigJam renderer.
+- Reconstructed the useful Unity Plotter behavior from the historical private `thecrimsondeveloper/Figma_Plugins` repository.
 
-This project rehabilitates the 2023 Unity Plotter concept from `thecrimsondeveloper/Figma_Plugins`; the historical repository is not modified by UniMap.
+The project predates formal release tracking; no historical release tags are fabricated here.

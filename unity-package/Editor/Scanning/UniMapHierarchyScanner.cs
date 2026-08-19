@@ -14,11 +14,11 @@ namespace LuminaryLabs.UniMap
             Scene scene = SceneManager.GetActiveScene();
             if (!scene.IsValid())
             {
-                throw new InvalidOperationException("There is no valid active scene to export.");
+                throw new InvalidOperationException("There is no valid active scene to scan.");
             }
 
             return BuildDocument(
-                string.IsNullOrWhiteSpace(scene.name) ? "Untitled Scene" : scene.name,
+                GetSceneName(scene),
                 scene.GetRootGameObjects(),
                 Application.unityVersion,
                 UniMapSerializer.ActiveSceneSource);
@@ -29,7 +29,7 @@ namespace LuminaryLabs.UniMap
             GameObject[] selected = Selection.gameObjects;
             if (selected == null || selected.Length == 0)
             {
-                throw new InvalidOperationException("Select at least one GameObject before exporting a selection.");
+                throw new InvalidOperationException("Select at least one GameObject before scanning a selection.");
             }
 
             HashSet<GameObject> selectedSet = new HashSet<GameObject>(selected);
@@ -38,8 +38,24 @@ namespace LuminaryLabs.UniMap
                 .OrderBy(GetStableHierarchyKey, StringComparer.Ordinal)
                 .ToList();
 
-            string sceneName = GetSelectionSceneName(roots);
-            return BuildDocument(sceneName, roots, Application.unityVersion, UniMapSerializer.SelectionSource);
+            return BuildDocument(
+                GetSelectionSceneName(roots),
+                roots,
+                Application.unityVersion,
+                UniMapSerializer.SelectionSource);
+        }
+
+        public static UniMapDocument BuildSelectionDocumentOrEmpty()
+        {
+            GameObject[] selected = Selection.gameObjects;
+            if (selected != null && selected.Length > 0)
+            {
+                return BuildSelectionDocument();
+            }
+
+            Scene scene = SceneManager.GetActiveScene();
+            string sceneName = scene.IsValid() ? GetSceneName(scene) : "Selection";
+            return UniMapSerializer.CreateEmpty(sceneName, Application.unityVersion, UniMapSerializer.SelectionSource);
         }
 
         public static UniMapDocument BuildDocument(
@@ -164,7 +180,7 @@ namespace LuminaryLabs.UniMap
         {
             string[] sceneNames = roots
                 .Where(root => root != null && root.scene.IsValid())
-                .Select(root => string.IsNullOrWhiteSpace(root.scene.name) ? "Untitled Scene" : root.scene.name)
+                .Select(root => GetSceneName(root.scene))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
 
@@ -183,6 +199,11 @@ namespace LuminaryLabs.UniMap
 
             segments.Reverse();
             return $"{gameObject.scene.name}/{string.Join("/", segments)}";
+        }
+
+        private static string GetSceneName(Scene scene)
+        {
+            return string.IsNullOrWhiteSpace(scene.name) ? "Untitled Scene" : scene.name;
         }
     }
 }

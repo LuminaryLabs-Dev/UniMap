@@ -1,0 +1,25 @@
+{
+  "name": "UniMap",
+  "id": "1281820949879720357",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "editorType": ["figjam"],
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "http://localhost:17432",
+      "http://localhost:17433",
+      "http://localhost:17434",
+      "http://localhost:17435",
+      "http://localhost:17436",
+      "http://localhost:17437",
+      "http://localhost:17438",
+      "http://localhost:17439",
+      "http://localhost:17440",
+      "http://localhost:17441",
+      "http://localhost:17442"
+    ],
+    "reasoning": "UniMap connects only to the read-only local UniMap service hosted by the user's Unity Editor."
+  }
+}

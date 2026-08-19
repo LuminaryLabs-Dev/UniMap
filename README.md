@@ -1,113 +1,152 @@
-# UniMap — Unity Brain Map
+# UniMap — Unity Local Integration API
 
-UniMap is a lightweight Unity Editor + FigJam visualization tool for turning Unity scene structure into readable, collaborative maps.
+UniMap is a lightweight, read-only local integration surface hosted by the Unity Editor. It turns the current Unity scene and selection into cached structural snapshots that local clients can read over HTTP.
 
 ```text
-Unity 6
-  ↓
-UniMap Editor package
-  ↓
-Scene / selection hierarchy scanner
-  ↓
-UniMap JSON v1
-  ↓
-UniMap FigJam plugin
-  ↓
-Unity Brain Map
+Unity Editor
+   │
+   ├─ UniMap scanner
+   │      ↓
+   ├─ cached immutable snapshot
+   │      ↓
+   └─ local API: http://localhost:17432-17442
+             │
+       ┌─────┼──────────┐
+       ↓     ↓          ↓
+    FigJam  Browser   Agents/scripts
 ```
+
+The FigJam Brain Map is the first client. It is no longer the architecture boundary.
 
 ## Status
 
-**v0.1.0 foundation.** The repository targets Unity 6.3 LTS as the primary editor and Unity 6.0 LTS as the minimum compatible Unity 6 line. Runtime support is only marked verified after an actual Editor smoke test; see [docs/compatibility.md](docs/compatibility.md) and [docs/validation.md](docs/validation.md).
+**v0.2.0 foundation on Unity 6.**
 
-## What UniMap captures
+- Unity 6.3 LTS is the primary validation target.
+- Unity 6.0 LTS is the minimum package target.
+- The local API is loopback-only and read-only.
+- Manual JSON export/import remains available as a fallback until real Unity + FigJam host smoke validation is complete.
 
-UniMap intentionally exports structural information, not every serialized Unity property:
+See [docs/validation.md](docs/validation.md) for the exact verified/unverified boundary.
 
-- scene name and Unity version
-- GameObject names and hierarchy
-- active/inactive state
-- component type names
-- component enabled/disabled state when Unity exposes one
-- child relationships and hierarchy depth
+## Install in Unity
 
-This keeps the Brain Map useful for developers, artists, designers, producers, and reviewers without turning it into a second Unity Inspector.
-
-## Unity package
-
-Install the package from this repository with Unity Package Manager:
+Use Unity Package Manager with:
 
 ```text
 https://github.com/LuminaryLabs-Dev/UniMap.git?path=/unity-package
 ```
 
-Then use:
+Then open:
 
 ```text
 Tools → UniMap → Open Brain Map
-Tools → UniMap → Export Active Scene
-Tools → UniMap → Export Selection
 ```
 
-The export is a local JSON file conforming to [schema/unimap-v1.schema.json](schema/unimap-v1.schema.json).
+UniMap starts its local host automatically when the Editor domain loads. The window shows the selected localhost port and can copy the per-session connection information for clients.
 
-## FigJam plugin
+## Local API
+
+The service binds only to the loopback interface and probes ports `17432` through `17442`.
+
+```text
+GET /health        no authentication; confirms UniMap is listening
+GET /v1/info       bearer token required
+GET /v1/scene      bearer token required
+GET /v1/selection  bearer token required
+GET /v1/schema     bearer token required
+OPTIONS *           CORS preflight only
+```
+
+All other methods are rejected. The request thread reads only immutable cached strings; Unity scene traversal happens on the Editor main thread when the cache is refreshed.
+
+Protocol definitions:
+
+- [OpenAPI](protocol/openapi.yaml)
+- [UniMap JSON v1 schema](protocol/unimap-v1.schema.json)
+
+## FigJam client
+
+The FigJam client lives under `clients/figjam/`.
 
 ```bash
-cd figjam-plugin
+cd clients/figjam
 npm ci
 npm run build
 npm test
 ```
 
-In Figma/FigJam, import `figjam-plugin/manifest.json` as a development plugin, open a FigJam board, run **UniMap**, and choose a UniMap JSON export.
+Import `clients/figjam/manifest.json` as a development plugin in FigJam.
 
-The plugin is offline-only: its manifest allows no network domains.
+Normal workflow:
+
+1. Open `Tools → UniMap → Open Brain Map` in Unity.
+2. Click **Copy Connection Info**.
+3. Paste the localhost URL and session token into the UniMap FigJam client.
+4. Connect.
+5. Render the current scene or current selection.
+
+The client is restricted by its manifest to the UniMap localhost port range only.
+
+## What the snapshot contains
+
+UniMap intentionally exposes structural data rather than every serialized component property:
+
+- Unity version
+- scene name
+- GameObject names
+- hierarchy relationships and depth
+- active/inactive state
+- component type names
+- enabled/disabled component state where Unity exposes it
+- missing-script markers
+
+This keeps the API useful for visualization, review and tooling without becoming a remote Unity Inspector.
+
+## Security boundary
+
+v0.2 is deliberately narrow:
+
+- loopback binding only (`127.0.0.1` / `localhost`)
+- no LAN binding
+- no wildcard socket binding
+- read-only `GET` endpoints
+- per-session 128-bit random bearer token
+- no object creation, deletion, renaming or component mutation
+- no arbitrary command execution
+- no filesystem API
+- request threads never traverse Unity scene objects
+
+See [docs/security.md](docs/security.md).
+
+## Fallback JSON snapshots
+
+The Unity window can still export `.unimap.json` files. This is secondary functionality for debugging, offline sharing, archival snapshots and host-validation fallback.
 
 ## Repository structure
 
 ```text
 .
-├── unity-package/        Unity 6 Editor package
-├── figjam-plugin/        FigJam renderer; TypeScript is authoritative
-├── schema/               UniMap JSON v1 contract
-├── examples/             Canonical export fixtures
-├── docs/                 Architecture, setup, compatibility, history
-└── scripts/              Repository-level validation
+├── unity-package/
+│   ├── Editor/
+│   │   ├── Model/
+│   │   ├── Scanning/
+│   │   ├── Snapshots/
+│   │   ├── Host/
+│   │   ├── UI/
+│   │   ├── Export/
+│   │   └── Protocol/
+│   └── Tests/
+├── clients/
+│   └── figjam/
+├── protocol/
+│   ├── openapi.yaml
+│   └── unimap-v1.schema.json
+├── examples/
+├── docs/
+└── scripts/
 ```
 
 ## Provenance
 
-UniMap rehabilitates the useful concept and rendering behavior of the 2023 **Unity Plotter** experiment in [`thecrimsondeveloper/Figma_Plugins`](https://github.com/thecrimsondeveloper/Figma_Plugins). That private historical repository remains untouched. UniMap is the maintained Luminary Labs home and uses a clean Unity 6 exporter plus a clean TypeScript FigJam build.
-
-The FigJam manifest currently preserves the historical Unity Plotter plugin ID (`1281820949879720357`) for development continuity. Publishing ownership must be verified in Figma before using that ID for a marketplace release.
-
-## Design boundaries
-
-UniMap is:
-
-- a read-only development visualization surface
-- a Unity → JSON → FigJam flow
-- deliberately small and local-first
-
-UniMap is **not**:
-
-- a Unity editor replacement
-- a runtime debugger
-- bidirectional Unity/FigJam synchronization
-- a dependency manager
-- a project management system
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [Unity package](docs/unity-package.md)
-- [FigJam plugin](docs/figjam-plugin.md)
-- [Data format](docs/data-format.md)
-- [Compatibility](docs/compatibility.md)
-- [Validation](docs/validation.md)
-- [History](docs/history.md)
-
-## License
-
-A repository license has not yet been selected. Do not assume permission to redistribute or relicense the project until Luminary Labs adds an explicit license.
+UniMap rehabilitates the useful idea behind the 2023 private repository `thecrimsondeveloper/Figma_Plugins`, specifically its **Unity Plotter** FigJam plugin. That historical repository remains untouched. UniMap is the maintained Luminary Labs implementation and uses a clean Unity-first local API architecture.

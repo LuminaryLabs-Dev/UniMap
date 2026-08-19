@@ -1,37 +1,41 @@
-# UniMap contributor and agent guidance
+# UniMap Agent Guardrails
 
-## Purpose
+## Product boundary
 
-UniMap converts Unity scene hierarchy data into an offline JSON snapshot and renders that snapshot as a collaborative FigJam Brain Map.
+UniMap is a **local, read-only Unity integration API**. FigJam is a client, not the source of truth.
 
-## Authoritative sources
+## Authoritative layers
 
-- Unity export contract: `schema/unimap-v1.schema.json`
-- Unity implementation: `unity-package/Editor/`
-- FigJam TypeScript source: `figjam-plugin/src/code.ts`
-- FigJam generated artifact: `figjam-plugin/dist/code.js`
-- compatibility claims: `docs/compatibility.md`
-- validation evidence: `docs/validation.md`
+1. `unity-package/Editor/Model/` — UniMap data model.
+2. `protocol/unimap-v1.schema.json` — canonical external snapshot contract.
+3. `unity-package/Editor/Scanning/` — Unity main-thread structural extraction.
+4. `unity-package/Editor/Snapshots/` — immutable cached response data.
+5. `unity-package/Editor/Host/` — loopback-only read-only HTTP transport.
+6. `clients/figjam/src/code.ts` — authoritative FigJam renderer source; `dist/code.js` is generated.
 
-## Guardrails
+## Hard safety rules
 
-1. **Never hand-edit `figjam-plugin/dist/code.js`.** Change `src/code.ts`, run the build, and commit the generated output.
-2. Preserve schema v1 compatibility unless intentionally introducing a new schema version.
-3. Do not export arbitrary serialized Unity properties in v0.1.x. Keep the data structural and human-readable.
-4. Do not add network access to the FigJam plugin without an explicit product decision and documentation update.
-5. Do not claim a Unity version is runtime-verified until it has been opened and smoke-tested in that Editor version.
-6. Keep one Unity package codebase across supported Unity 6 versions. Use narrowly scoped version conditionals only when verified necessary.
-7. The historical `thecrimsondeveloper/Figma_Plugins` repository is provenance, not a deployment target.
-8. The historical Figma plugin ID is preserved for continuity; verify Figma publishing ownership before marketplace publication.
+- Do not bind UniMap to `0.0.0.0`, `IPAddress.Any`, `*`, `+`, a LAN address, or a public interface.
+- Do not add write endpoints without an explicit new product/security decision.
+- HTTP request threads must never call Unity hierarchy/scene APIs.
+- Do not expose arbitrary files, commands or serialized component values through the host.
+- Keep bearer authentication on all `/v1/*` endpoints.
+- `/health` may remain unauthenticated and must not expose project data.
+- Keep CORS compatible with Figma's null-origin iframe, but rely on the token for data authorization.
+- Do not change the Figma plugin ID casually.
+- Do not edit `clients/figjam/dist/code.js` directly; regenerate it from TypeScript.
+- Keep `protocol/unimap-v1.schema.json` and the package copy byte-identical.
 
-## Required validation before release
+## Validation expectations
+
+Before publishing a change:
 
 ```bash
-cd figjam-plugin
+cd clients/figjam
 npm ci
 npm run check
-cd ..
+cd ../..
 node scripts/validate-repo.mjs
 ```
 
-Also run Unity EditMode tests and a manual export smoke test in each Unity version being marked runtime-verified.
+Unity runtime/editor claims require actual Unity Editor validation. FigJam host claims require an actual FigJam development-plugin smoke test.

@@ -1,36 +1,8 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace LuminaryLabs.UniMap
 {
-    [Serializable]
-    public sealed class UniMapDocument
-    {
-        public string schemaVersion = UniMapSerializer.SchemaVersion;
-        public string scene = string.Empty;
-        public string unityVersion = string.Empty;
-        public string source = UniMapSerializer.ActiveSceneSource;
-        public List<UniMapHierarchyObject> hierarchyObjects = new List<UniMapHierarchyObject>();
-    }
-
-    [Serializable]
-    public sealed class UniMapHierarchyObject
-    {
-        public string Name = string.Empty;
-        public bool IsEnabled;
-        public int Depth;
-        public List<UniMapComponent> Components = new List<UniMapComponent>();
-        public List<UniMapHierarchyObject> Children = new List<UniMapHierarchyObject>();
-    }
-
-    [Serializable]
-    public sealed class UniMapComponent
-    {
-        public string Name = string.Empty;
-        public bool IsEnabled;
-    }
-
     public static class UniMapSerializer
     {
         public const string SchemaVersion = "1.0";
@@ -96,6 +68,17 @@ namespace LuminaryLabs.UniMap
 
             error = string.Empty;
             return true;
+        }
+
+        public static UniMapDocument CreateEmpty(string sceneName, string unityVersion, string source)
+        {
+            return new UniMapDocument
+            {
+                schemaVersion = SchemaVersion,
+                scene = string.IsNullOrWhiteSpace(sceneName) ? "Untitled Scene" : sceneName,
+                unityVersion = string.IsNullOrWhiteSpace(unityVersion) ? "unknown" : unityVersion,
+                source = source,
+            };
         }
 
         private static bool TryValidateHierarchyObject(

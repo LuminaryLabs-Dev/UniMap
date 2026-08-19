@@ -1,8 +1,8 @@
 {
   "name": "com.luminarylabs.unimap",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "UniMap",
-  "description": "Unity Brain Map editor tooling for exporting scene and selection hierarchy data to the UniMap JSON format.",
+  "description": "Local read-only Unity Editor integration API for structural project snapshots and Brain Map clients.",
   "unity": "6000.0",
   "author": {
     "name": "Luminary Labs",
@@ -12,6 +12,7 @@
     "unity",
     "editor",
     "hierarchy",
+    "local-api",
     "visualization",
     "figjam"
   ]

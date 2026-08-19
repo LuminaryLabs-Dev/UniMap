@@ -9,10 +9,7 @@
       "IsEnabled": true,
       "Depth": 0,
       "Components": [
-        {
-          "Name": "Transform",
-          "IsEnabled": true
-        }
+        { "Name": "Transform", "IsEnabled": true }
       ],
       "Children": [
         {
@@ -20,14 +17,8 @@
           "IsEnabled": true,
           "Depth": 1,
           "Components": [
-            {
-              "Name": "Transform",
-              "IsEnabled": true
-            },
-            {
-              "Name": "GameplayDirector",
-              "IsEnabled": false
-            }
+            { "Name": "Transform", "IsEnabled": true },
+            { "Name": "GameplayDirector", "IsEnabled": false }
           ],
           "Children": [
             {
@@ -35,14 +26,8 @@
               "IsEnabled": false,
               "Depth": 2,
               "Components": [
-                {
-                  "Name": "Transform",
-                  "IsEnabled": true
-                },
-                {
-                  "Name": "BoxCollider",
-                  "IsEnabled": false
-                }
+                { "Name": "Transform", "IsEnabled": true },
+                { "Name": "BoxCollider", "IsEnabled": false }
               ],
               "Children": []
             }

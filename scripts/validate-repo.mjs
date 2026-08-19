@@ -1,102 +1,150 @@
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
+const exists = rel => fs.existsSync(path.join(root, rel));
+
 const required = [
   'README.md',
   'AGENTS.md',
   'CHANGELOG.md',
+  'protocol/openapi.yaml',
+  'protocol/unimap-v1.schema.json',
   'unity-package/package.json',
-  'unity-package/Editor/LuminaryLabs.UniMap.Editor.asmdef',
-  'unity-package/Editor/UniMapHierarchyScanner.cs',
-  'unity-package/Editor/UniMapSerializer.cs',
-  'unity-package/Editor/UniMapExporter.cs',
-  'unity-package/Editor/UniMapWindow.cs',
-  'unity-package/Tests/Editor/UniMapTests.cs',
-  'figjam-plugin/manifest.json',
-  'figjam-plugin/package.json',
-  'figjam-plugin/package-lock.json',
-  'figjam-plugin/src/code.ts',
-  'figjam-plugin/dist/code.js',
-  'schema/unimap-v1.schema.json',
-  'examples/basic-scene.json',
-  'examples/nested-scene.json'
+  'unity-package/Editor/Host/UniMapHost.cs',
+  'unity-package/Editor/Host/UniMapRouter.cs',
+  'unity-package/Editor/Snapshots/UniMapSnapshotService.cs',
+  'unity-package/Editor/Protocol/unimap-v1.schema.json',
+  'clients/figjam/manifest.json',
+  'clients/figjam/src/code.ts',
+  'clients/figjam/dist/code.js',
+  'clients/figjam/ui.html',
 ];
+for (const rel of required) assert.ok(exists(rel), `missing ${rel}`);
 
-for (const relative of required) {
-  const full = path.join(root, relative);
-  if (!fs.existsSync(full)) throw new Error(`Missing required file: ${relative}`);
+assert.ok(!exists('figjam-plugin'), 'legacy figjam-plugin/ directory must be removed');
+assert.ok(!exists('schema'), 'legacy schema/ directory must be removed');
+
+const unityPackage = JSON.parse(read('unity-package/package.json'));
+assert.equal(unityPackage.name, 'com.luminarylabs.unimap');
+assert.equal(unityPackage.version, '0.2.0');
+assert.equal(unityPackage.unity, '6000.0');
+
+const canonicalSchema = read('protocol/unimap-v1.schema.json');
+const packageSchema = read('unity-package/Editor/Protocol/unimap-v1.schema.json');
+assert.equal(packageSchema, canonicalSchema, 'Unity package schema copy must exactly match canonical protocol schema');
+const schema = JSON.parse(canonicalSchema);
+assert.equal(schema.properties.schemaVersion.const, '1.0');
+
+const manifest = JSON.parse(read('clients/figjam/manifest.json'));
+const expectedDomains = Array.from({ length: 11 }, (_, index) => `http://localhost:${17432 + index}`);
+assert.deepEqual(manifest.networkAccess.allowedDomains, expectedDomains);
+assert.equal(manifest.documentAccess, 'dynamic-page');
+assert.ok(manifest.networkAccess.reasoning.length > 20);
+assert.ok(!manifest.networkAccess.allowedDomains.includes('*'));
+
+const openapi = read('protocol/openapi.yaml');
+for (const endpoint of ['/health:', '/v1/info:', '/v1/scene:', '/v1/selection:', '/v1/schema:']) {
+  assert.ok(openapi.includes(endpoint), `OpenAPI missing ${endpoint}`);
+}
+assert.ok(openapi.includes('bearerAuth'));
+
+const host = read('unity-package/Editor/Host/UniMapHost.cs');
+assert.ok(host.includes('IPAddress.Loopback'), 'host must bind loopback');
+assert.ok(read('unity-package/Editor/Protocol/UniMapProtocol.cs').includes('LoopbackHost = "localhost"'));
+assert.ok(!host.includes('IPAddress.Any'), 'host must not bind all interfaces');
+assert.ok(!host.includes('0.0.0.0'), 'host must not bind 0.0.0.0');
+assert.ok(host.includes('Access-Control-Allow-Origin: *'));
+assert.ok(host.includes('Access-Control-Allow-Methods: GET, OPTIONS'));
+assert.ok(host.includes('Access-Control-Allow-Private-Network: true'));
+for (const forbiddenUnityCall of ['SceneManager.', 'Selection.', 'GetRootGameObjects', 'GetComponents<', 'Transform ']) {
+  assert.ok(!host.includes(forbiddenUnityCall), `HTTP thread source must not traverse Unity objects: ${forbiddenUnityCall}`);
 }
 
-const jsonFiles = [
-  'unity-package/package.json',
-  'unity-package/Editor/LuminaryLabs.UniMap.Editor.asmdef',
-  'unity-package/Tests/Editor/LuminaryLabs.UniMap.Editor.Tests.asmdef',
-  'figjam-plugin/manifest.json',
-  'figjam-plugin/package.json',
-  'figjam-plugin/package-lock.json',
-  'figjam-plugin/tsconfig.json',
-  'schema/unimap-v1.schema.json',
-  'examples/basic-scene.json',
-  'examples/nested-scene.json'
-];
-for (const relative of jsonFiles) JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
-
-const unityPackage = JSON.parse(fs.readFileSync(path.join(root, 'unity-package/package.json'), 'utf8'));
-if (unityPackage.name !== 'com.luminarylabs.unimap') throw new Error('Unexpected Unity package name');
-if (unityPackage.unity !== '6000.0') throw new Error('Unity compatibility floor must remain 6000.0 for v0.1');
-
-const manifest = JSON.parse(fs.readFileSync(path.join(root, 'figjam-plugin/manifest.json'), 'utf8'));
-if (manifest.name !== 'UniMap') throw new Error('FigJam plugin must be named UniMap');
-if (manifest.main !== 'dist/code.js') throw new Error('FigJam manifest must execute generated dist/code.js');
-if (JSON.stringify(manifest.editorType) !== JSON.stringify(['figjam'])) throw new Error('UniMap must remain FigJam-only in v0.1');
-if (JSON.stringify(manifest.networkAccess?.allowedDomains) !== JSON.stringify(['none'])) throw new Error('UniMap v0.1 must remain offline-only');
-
-const tsconfig = JSON.parse(fs.readFileSync(path.join(root, 'figjam-plugin/tsconfig.json'), 'utf8'));
-const expectedTypeRoots = ['./node_modules/@types', './node_modules/@figma'];
-if (JSON.stringify(tsconfig.compilerOptions?.typeRoots) !== JSON.stringify(expectedTypeRoots)) {
-  throw new Error("FigJam tsconfig must use Figma's documented typeRoots layout");
+const router = read('unity-package/Editor/Host/UniMapRouter.cs');
+assert.ok(router.includes('"GET"'));
+assert.ok(router.includes('"OPTIONS"'));
+for (const route of ['/health', '/v1/info', '/v1/scene', '/v1/selection', '/v1/schema']) {
+  assert.ok(router.includes(route), `router missing ${route}`);
+}
+for (const writeVerb of ['"POST"', '"PUT"', '"PATCH"', '"DELETE"']) {
+  assert.ok(!router.includes(writeVerb), `router must not define ${writeVerb}`);
 }
 
-const figjamSource = fs.readFileSync(path.join(root, 'figjam-plugin/src/code.ts'), 'utf8');
-if (figjamSource.includes('declare const __html__')) throw new Error('Use the __html__ global from official Figma typings; do not redeclare it in source');
-if (figjamSource.includes('.rescale(')) throw new Error('Do not use StickyNode.rescale; current FigJam typings do not support it');
-if (figjamSource.includes('alert(')) throw new Error('Debug alert() calls must not return to the maintained plugin');
-const unityWindow = fs.readFileSync(path.join(root, 'unity-package/Editor/UniMapWindow.cs'), 'utf8');
-if (unityWindow.includes('validate = true') || unityWindow.includes('priority =')) throw new Error('Unity MenuItem attributes must use compile-safe positional arguments');
+const snapshotService = read('unity-package/Editor/Snapshots/UniMapSnapshotService.cs');
+assert.ok(snapshotService.includes('EditorApplication.hierarchyChanged'));
+assert.ok(snapshotService.includes('Selection.selectionChanged'));
+assert.ok(snapshotService.includes('DebounceSeconds = 0.2d'));
 
-const pkg = JSON.parse(fs.readFileSync(path.join(root, 'figjam-plugin/package.json'), 'utf8'));
-const lock = JSON.parse(fs.readFileSync(path.join(root, 'figjam-plugin/package-lock.json'), 'utf8'));
-for (const [name, version] of Object.entries(pkg.devDependencies ?? {})) {
-  const entry = lock.packages?.[`node_modules/${name}`];
-  if (!entry || entry.version !== version) throw new Error(`Lock mismatch for ${name}: expected ${version}`);
+const ui = read('clients/figjam/ui.html');
+for (const endpoint of ['/health', '/v1/info', '/v1/scene', '/v1/selection']) assert.ok(ui.includes(endpoint));
+assert.ok(ui.includes('Authorization'));
+assert.ok(ui.includes('Bearer ${token}'));
+assert.ok(ui.includes('load-connection-settings'));
+assert.ok(ui.includes('save-connection-settings'));
+assert.ok(!ui.includes('localStorage'));
+assert.ok(ui.includes('http://localhost:17432'));
+assert.ok(!ui.includes('WebSocket'));
+
+for (const exampleName of ['basic-scene.json', 'nested-scene.json']) {
+  const example = JSON.parse(read(`examples/${exampleName}`));
+  assert.equal(example.schemaVersion, '1.0');
 }
 
-const schema = JSON.parse(fs.readFileSync(path.join(root, 'schema/unimap-v1.schema.json'), 'utf8'));
-if (schema.properties?.schemaVersion?.const !== '1.0') throw new Error('Schema version must be 1.0');
+for (const rel of walk(path.join(root, 'unity-package')).filter(file => file.endsWith('.cs'))) {
+  assertBalancedBraces(fs.readFileSync(rel, 'utf8'), path.relative(root, rel));
+}
 
-function validateNode(node, expectedDepth, pathLabel) {
-  if (!node || typeof node !== 'object' || Array.isArray(node)) throw new Error(`${pathLabel} must be an object`);
-  if (typeof node.Name !== 'string' || !node.Name.trim()) throw new Error(`${pathLabel}.Name invalid`);
-  if (typeof node.IsEnabled !== 'boolean') throw new Error(`${pathLabel}.IsEnabled invalid`);
-  if (node.Depth !== expectedDepth) throw new Error(`${pathLabel}.Depth expected ${expectedDepth}, got ${node.Depth}`);
-  if (!Array.isArray(node.Components) || !Array.isArray(node.Children)) throw new Error(`${pathLabel} arrays missing`);
-  for (let i = 0; i < node.Components.length; i++) {
-    const c = node.Components[i];
-    if (!c || typeof c.Name !== 'string' || !c.Name.trim() || typeof c.IsEnabled !== 'boolean') throw new Error(`${pathLabel}.Components[${i}] invalid`);
+console.log('UniMap repository contract validation passed.');
+
+function walk(directory) {
+  const out = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) out.push(...walk(full));
+    else out.push(full);
   }
-  node.Children.forEach((child, i) => validateNode(child, expectedDepth + 1, `${pathLabel}.Children[${i}]`));
+  return out;
 }
 
-for (const relative of ['examples/basic-scene.json', 'examples/nested-scene.json']) {
-  const doc = JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
-  if (doc.schemaVersion !== '1.0') throw new Error(`${relative} schemaVersion mismatch`);
-  if (!['active-scene', 'selection'].includes(doc.source)) throw new Error(`${relative} source invalid`);
-  if (!Array.isArray(doc.hierarchyObjects)) throw new Error(`${relative} hierarchyObjects missing`);
-  doc.hierarchyObjects.forEach((node, i) => validateNode(node, 0, `${relative}.hierarchyObjects[${i}]`));
+function assertBalancedBraces(source, label) {
+  let depth = 0;
+  let inString = false;
+  let verbatim = false;
+  let escaped = false;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    const next = source[i + 1];
+    if (!inString && ch === '/' && next === '/') {
+      const end = source.indexOf('\n', i + 2);
+      i = end === -1 ? source.length : end;
+      continue;
+    }
+    if (!inString && ch === '"') {
+      inString = true;
+      verbatim = i > 0 && source[i - 1] === '@';
+      escaped = false;
+      continue;
+    }
+    if (inString) {
+      if (verbatim) {
+        if (ch === '"' && next === '"') { i++; continue; }
+        if (ch === '"') inString = false;
+      } else if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '{') depth++;
+    if (ch === '}') depth--;
+    assert.ok(depth >= 0, `${label}: closing brace without opener`);
+  }
+  assert.equal(depth, 0, `${label}: unbalanced braces`);
 }
-
-execFileSync(process.execPath, ['--check', path.join(root, 'figjam-plugin/dist/code.js')], { stdio: 'inherit' });
-console.log('UniMap repository validation passed.');

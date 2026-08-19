@@ -1,46 +1,19 @@
-# History and provenance
+# History
 
 ## 2023 — Unity Plotter
 
-The precursor lived in the private repository:
+The private `thecrimsondeveloper/Figma_Plugins` repository contained a FigJam plugin named **Unity Plotter**. It visualized Unity hierarchy JSON using nested FigJam sections and component stickies.
 
-[`thecrimsondeveloper/Figma_Plugins`](https://github.com/thecrimsondeveloper/Figma_Plugins)
+## 2026 — UniMap v0.1 foundation
 
-Its meaningful tool was **Unity Plotter**, a FigJam-only plugin that accepted Unity hierarchy JSON and recursively created FigJam sections and component sticky notes.
+The useful concept was rehabilitated in `LuminaryLabs-Dev/UniMap` with a Unity 6 UPM package, formal JSON v1 schema, TypeScript FigJam renderer, fixtures and validation.
 
-The historical implementation established several useful ideas:
+## 2026 — UniMap v0.2 architecture
 
-- local JSON upload
-- recursive hierarchy visualization
-- nested sections
-- component sticky notes
-- enabled/disabled labeling
-- automatic sizing and layout
-
-It also accumulated rehabilitation problems:
-
-- the real implementation lived in `code.js` while `code.ts` remained starter/template code
-- running the documented TypeScript build could overwrite the working implementation
-- input structure was implicit rather than schema-defined
-- JSON parsing and selection/fill assumptions were weakly guarded
-- the README was largely generic Figma plugin setup text
-- the UI contained debugging utilities unrelated to the core product
-
-The final historical commits edited JavaScript directly, confirming that JavaScript—not TypeScript—had become the de facto source during late development.
-
-## 2026 — UniMap
-
-`LuminaryLabs-Dev/UniMap` becomes the clean maintained home under the product identity:
-
-**UniMap — Unity Brain Map**
-
-The rehabilitation keeps the useful visualization concept while changing the architecture:
+UniMap moved from a file-transfer workflow to a Unity-first local integration surface:
 
 ```text
-old: Unity JSON (external/implicit) → Unity Plotter FigJam plugin
-new: UniMap Unity 6 exporter → versioned JSON contract → UniMap FigJam plugin
+Unity → cached snapshot → local API → clients
 ```
 
-TypeScript is restored as the sole FigJam source of truth. The old repository remains untouched as historical provenance.
-
-The new renderer also avoids relying on the old `StickyNode.rescale()` behavior; current Figma documentation does not list StickyNode among nodes supporting the generic `rescale()` API.
+FigJam became the first client rather than the architecture owner. Manual JSON export/import was retained only as fallback capability during host validation.

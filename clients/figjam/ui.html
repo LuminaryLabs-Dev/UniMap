@@ -1,0 +1,219 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; background: var(--figma-color-bg); color: var(--figma-color-text); font-size: 12px; }
+    h1 { margin: 0 0 4px; font-size: 17px; }
+    h2 { margin: 16px 0 8px; font-size: 12px; }
+    p { margin: 0 0 12px; color: var(--figma-color-text-secondary); line-height: 1.45; }
+    label { display: block; margin: 8px 0 4px; font-weight: 600; }
+    input[type=text], input[type=password] { width: 100%; border: 1px solid var(--figma-color-border); border-radius: 6px; padding: 8px; background: var(--figma-color-bg); color: var(--figma-color-text); font: inherit; }
+    .row { display: flex; gap: 8px; margin-top: 8px; }
+    button { border: 0; border-radius: 6px; padding: 9px 11px; font: inherit; font-weight: 600; cursor: pointer; }
+    button.primary { flex: 1; color: var(--figma-color-text-onbrand); background: var(--figma-color-bg-brand); }
+    button.secondary { color: var(--figma-color-text); background: var(--figma-color-bg-secondary); }
+    button:disabled { opacity: .45; cursor: default; }
+    #status { min-height: 34px; margin-top: 12px; padding: 8px 10px; border-radius: 6px; background: var(--figma-color-bg-secondary); line-height: 1.4; }
+    #status.error { color: var(--figma-color-text-danger); }
+    #status.ok { color: var(--figma-color-text-success); }
+    .meta { margin-top: 8px; color: var(--figma-color-text-secondary); line-height: 1.4; }
+    details { margin-top: 14px; border-top: 1px solid var(--figma-color-border); padding-top: 10px; }
+    summary { cursor: pointer; font-weight: 600; }
+    .file { margin-top: 8px; }
+    .small { font-size: 11px; color: var(--figma-color-text-secondary); }
+  </style>
+</head>
+<body>
+  <h1>UniMap</h1>
+  <p>Connect to the read-only UniMap host running inside Unity, then render the current scene or selection.</p>
+
+  <label for="baseUrl">Unity host</label>
+  <input id="baseUrl" type="text" value="http://localhost:17432" spellcheck="false" />
+  <label for="token">Session token</label>
+  <input id="token" type="password" autocomplete="off" spellcheck="false" />
+
+  <div class="row">
+    <button class="primary" id="connect">Connect</button>
+    <button class="secondary" id="refresh" disabled>Refresh</button>
+    <button class="secondary" id="close">Close</button>
+  </div>
+
+  <div id="status">Paste the connection info from Unity and connect.</div>
+  <div class="meta" id="meta"></div>
+
+  <h2>Brain Map</h2>
+  <div class="row">
+    <button class="primary" id="scene" disabled>Render Scene</button>
+    <button class="primary" id="selection" disabled>Render Selection</button>
+  </div>
+
+  <details>
+    <summary>Fallback: load a UniMap JSON file</summary>
+    <p class="small">Use this for archival snapshots, debugging, or when the Unity host is unavailable.</p>
+    <input class="file" id="fileInput" type="file" accept=".json,application/json" />
+    <button class="secondary" id="renderFile" disabled>Render Selected JSON</button>
+  </details>
+
+  <script>
+    const PORT_MIN = 17432;
+    const PORT_MAX = 17442;
+    const MAX_FILE_BYTES = 10 * 1024 * 1024;
+    const baseUrlInput = document.getElementById('baseUrl');
+    const tokenInput = document.getElementById('token');
+    const connectButton = document.getElementById('connect');
+    const refreshButton = document.getElementById('refresh');
+    const sceneButton = document.getElementById('scene');
+    const selectionButton = document.getElementById('selection');
+    const status = document.getElementById('status');
+    const meta = document.getElementById('meta');
+    const fileInput = document.getElementById('fileInput');
+    const renderFileButton = document.getElementById('renderFile');
+    let connected = false;
+    let fallbackJson = null;
+
+    function setStatus(message, kind = '') {
+      status.textContent = message;
+      status.className = kind;
+    }
+
+    function setConnected(value) {
+      connected = value;
+      refreshButton.disabled = !value;
+      sceneButton.disabled = !value;
+      selectionButton.disabled = !value;
+    }
+
+    function normalizeBaseUrl(value) {
+      const match = String(value || '').trim().match(/^http:\/\/localhost:(\d{5})\/?$/i);
+      if (!match) throw new Error('Host must look like http://localhost:17432.');
+      const port = Number(match[1]);
+      if (!Number.isInteger(port) || port < PORT_MIN || port > PORT_MAX) {
+        throw new Error(`UniMap ports are limited to ${PORT_MIN}-${PORT_MAX}.`);
+      }
+      return `http://localhost:${port}`;
+    }
+
+    function getCredentials() {
+      const baseUrl = normalizeBaseUrl(baseUrlInput.value);
+      const token = tokenInput.value.trim();
+      if (!/^[0-9a-f]{32}$/i.test(token)) {
+        throw new Error('Paste the 32-character session token from the Unity UniMap window.');
+      }
+      return { baseUrl, token };
+    }
+
+    async function fetchJson(path, auth = true) {
+      const { baseUrl, token } = getCredentials();
+      const headers = auth ? { Authorization: `Bearer ${token}` } : {};
+      const response = await fetch(baseUrl + path, { method: 'GET', headers, cache: 'no-store' });
+      const text = await response.text();
+      if (!response.ok) {
+        let message = `${response.status} ${response.statusText}`;
+        try {
+          const body = JSON.parse(text);
+          if (body && typeof body.error === 'string') message = body.error;
+        } catch {}
+        throw new Error(message);
+      }
+      return { text, json: text ? JSON.parse(text) : null };
+    }
+
+    async function refreshInfo() {
+      const info = await fetchJson('/v1/info');
+      const value = info.json || {};
+      meta.textContent = `${value.project || 'Unity project'} / ${value.scene || 'scene'} • Unity ${value.unityVersion || '?'} • revision ${value.snapshotRevision || '?'}`;
+      return value;
+    }
+
+    async function connect() {
+      setConnected(false);
+      meta.textContent = '';
+      setStatus('Connecting to Unity…');
+      try {
+        const health = await fetchJson('/health', false);
+        if (!health.json || health.json.service !== 'UniMap') throw new Error('The local service is not UniMap.');
+        await refreshInfo();
+        const { baseUrl, token } = getCredentials();
+        parent.postMessage({
+          pluginMessage: { type: 'save-connection-settings', baseUrl, token }
+        }, '*');
+        setConnected(true);
+        setStatus('Connected to Unity.', 'ok');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Could not connect to Unity.', 'error');
+      }
+    }
+
+    async function renderEndpoint(path, label) {
+      if (!connected) return;
+      setStatus(`Loading ${label} from Unity…`);
+      try {
+        const response = await fetchJson(path);
+        parent.postMessage({ pluginMessage: { type: 'render-document', rawJson: response.text } }, '*');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : `Could not load ${label}.`, 'error');
+      }
+    }
+
+    connectButton.onclick = connect;
+    refreshButton.onclick = async () => {
+      try {
+        await refreshInfo();
+        setStatus('Unity snapshot metadata refreshed.', 'ok');
+      } catch (error) {
+        setConnected(false);
+        setStatus(error instanceof Error ? error.message : 'Refresh failed.', 'error');
+      }
+    };
+    sceneButton.onclick = () => renderEndpoint('/v1/scene', 'scene');
+    selectionButton.onclick = () => renderEndpoint('/v1/selection', 'selection');
+    document.getElementById('close').onclick = () => parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
+
+    fileInput.onchange = () => {
+      fallbackJson = null;
+      renderFileButton.disabled = true;
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      if (file.size > MAX_FILE_BYTES) {
+        setStatus('File is larger than the 10 MB safety limit.', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== 'string') return setStatus('Could not read JSON file.', 'error');
+        try {
+          JSON.parse(reader.result);
+          fallbackJson = reader.result;
+          renderFileButton.disabled = false;
+          setStatus('Fallback JSON loaded.');
+        } catch {
+          setStatus('Selected file is not valid JSON.', 'error');
+        }
+      };
+      reader.onerror = () => setStatus('Could not read JSON file.', 'error');
+      reader.readAsText(file, 'UTF-8');
+    };
+
+    renderFileButton.onclick = () => {
+      if (!fallbackJson) return;
+      parent.postMessage({ pluginMessage: { type: 'render-document', rawJson: fallbackJson } }, '*');
+    };
+
+    onmessage = (event) => {
+      const message = event.data && event.data.pluginMessage;
+      if (!message || typeof message.type !== 'string') return;
+      if (message.type === 'connection-settings') {
+        if (typeof message.baseUrl === 'string' && message.baseUrl) baseUrlInput.value = message.baseUrl;
+        if (typeof message.token === 'string' && message.token) tokenInput.value = message.token;
+      }
+      if (message.type === 'render-success') setStatus(message.message || 'Brain Map rendered.', 'ok');
+      if (message.type === 'render-error') setStatus(message.message || 'Brain Map render failed.', 'error');
+    };
+
+    parent.postMessage({ pluginMessage: { type: 'load-connection-settings' } }, '*');
+  </script>
+</body>
+</html>
