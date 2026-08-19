@@ -54,8 +54,14 @@ if (manifest.main !== 'dist/code.js') throw new Error('FigJam manifest must exec
 if (JSON.stringify(manifest.editorType) !== JSON.stringify(['figjam'])) throw new Error('UniMap must remain FigJam-only in v0.1');
 if (JSON.stringify(manifest.networkAccess?.allowedDomains) !== JSON.stringify(['none'])) throw new Error('UniMap v0.1 must remain offline-only');
 
+const tsconfig = JSON.parse(fs.readFileSync(path.join(root, 'figjam-plugin/tsconfig.json'), 'utf8'));
+const expectedTypeRoots = ['./node_modules/@types', './node_modules/@figma'];
+if (JSON.stringify(tsconfig.compilerOptions?.typeRoots) !== JSON.stringify(expectedTypeRoots)) {
+  throw new Error("FigJam tsconfig must use Figma's documented typeRoots layout");
+}
+
 const figjamSource = fs.readFileSync(path.join(root, 'figjam-plugin/src/code.ts'), 'utf8');
-if (!figjamSource.includes('declare const __html__: string;')) throw new Error('FigJam TypeScript must declare the bundled __html__ global');
+if (figjamSource.includes('declare const __html__')) throw new Error('Use the __html__ global from official Figma typings; do not redeclare it in source');
 if (figjamSource.includes('.rescale(')) throw new Error('Do not use StickyNode.rescale; current FigJam typings do not support it');
 if (figjamSource.includes('alert(')) throw new Error('Debug alert() calls must not return to the maintained plugin');
 const unityWindow = fs.readFileSync(path.join(root, 'unity-package/Editor/UniMapWindow.cs'), 'utf8');

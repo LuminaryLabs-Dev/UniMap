@@ -9,8 +9,9 @@
     "outFile": "dist/code.js",
     "noEmitOnError": true,
     "skipLibCheck": false,
-    "types": [
-      "@figma/plugin-typings"
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@figma"
     ]
   },
   "include": [
